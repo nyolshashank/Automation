@@ -1,0 +1,165 @@
+Sub Combined_Code()
+    ' Last updated = 15 May 2023
+
+    ' Numbering of Nodes
+    Dim ws1, ws2 As Worksheet
+    Set ws1 = Worksheets("Input")      ' referring input sheet as ws1
+    Set ws2 = Worksheets("Output")       ' referring output sheet as ws2
+    ws2.Cells.ClearContents
+    
+    'Naming headers
+    ws2.Cells(1, 2).Value = "Elevation (m)"
+    ws2.Cells(1, 3).Value = "Force at Node (kN/m)"
+    ws2.Cells(1, 4).Value = "D1"
+    ws2.Cells(1, 5).Value = "D2"
+    ws2.Cells(1, 6).Value = "D3"
+    ws2.Cells(1, 7).Value = "D4"
+    ws2.Cells(1, 8).Value = "P1 (kN/m)"
+    ws2.Cells(1, 9).Value = "P2 (kN/m)"
+    ws2.Cells(1, 10).Value = "P3 (kN/m)"
+    ws2.Cells(1, 11).Value = "P4 (kN/m)"
+    
+    ws2.Cells(2, 1).Value = ws1.Range("E3").Value
+    ws2.Cells(2, 2).Value = ws1.Range("E4").Value
+    
+    ' Warning for bad input
+    If ws1.Cells(10 + 3, 3).Value <> ws1.Cells(5, 5).Value Then
+            MsgBox ("Error! Bad input!" & Chr(10) & "Depth of bed and depth of last point of force application are different!" & Chr(10) & "Make both equal and proceed only after removing error!")
+    End If
+    
+    Dim i, j, i_max, j_max As Integer    ' nod_sep is the seperation of length b/w two nodes
+    Dim z_top, z_bed, nod_sep As Single
+    
+    z_top = ws1.Range("E4").Value
+    z_bed = ws1.Range("E5").Value
+    nod_sep = ws1.Range("E6").Value
+    
+    i_max = 0
+    While z_top - i_max * nod_sep > z_bed
+        i_max = i_max + 1
+    Wend
+    
+    For i = 1 To i_max
+        ws2.Cells(2 + i, 1).Value = ws2.Cells(1 + i, 1).Value + 1
+        ws2.Cells(2 + i, 2).Value = ws2.Cells(1 + i, 2).Value - nod_sep
+    Next i
+    
+    ' Application of forces
+    
+    j_max = 1
+    While Abs(ws1.Cells(j_max + 10, 3).Value - z_bed) > 0.00001
+        ' single data type is never equated to 0 in condition, because it stores values with certain errors
+        ' https://learn.microsoft.com/en-us/dotnet/visual-basic/programming-guide/language-features/data-types/troubleshooting-data-types#floating-point-expressions-do-not-compare-as-equal
+        ' in above comparison accuracy of 0.00001 is manatined which is assumed to fit for practical purposes and should be appropriate according to the accuracy of single data type
+        ' however the accuracy of comparing single data types taken as 1e-5 is not verified
+        j_max = j_max + 1
+    Wend
+
+    i = 0
+    j = 0
+    
+    While ws2.Cells(2 + i, 2).Value > ws1.Cells(11, 3).Value
+        ws2.Cells(2 + i, 3).Value = 0
+        i = i + 1
+    Wend
+    
+    Dim x, x1, x2, y1, y2 As Single
+    
+    ' No. of rows in input force table
+    For j = 1 To j_max
+        While ws2.Cells(2 + i, 2).Value > ws1.Cells(11 + j, 3).Value
+            x = ws2.Cells(2 + i, 2).Value
+            x1 = ws1.Cells(10 + j, 3).Value
+            x2 = ws1.Cells(11 + j, 3).Value
+            y1 = ws1.Cells(10 + j, 1).Value
+            y2 = ws1.Cells(11 + j, 1).Value
+            ws2.Cells(2 + i, 3).Value = (x - x2) / (x1 - x2) * y1 + (x - x1) / (x2 - x1) * y2
+            i = i + 1
+        Wend
+    Next j
+    
+    ws2.Cells(2 + i, 3).Value = 0
+    
+    ' Force input for MIDAS
+    
+    ' Case B (see page 3 of diary 1)
+        i = 0
+        While ws2.Cells(3 + i, 2).Value >= ws1.Cells(11, 3).Value
+            i = i + 1
+        Wend
+        
+        If ws1.Cells(10 + j_max, 3).Value > ws2.Cells(3 + i, 2).Value Then
+            MsgBox ("Error! Node separation is inadequate!" & Chr(10) & "Reduce node separation and proceed only after removing error!")
+            ' above line of code makes sure that last ordinate of input force table lies outside element under consideration
+        End If
+        
+        Dim k, k_max As Integer
+        k_max = 1          ' because first distance ordinate of input force table will compulsarily lie within element as per case definition
+        
+        While ws1.Cells(10 + k_max + 1, 3).Value > ws2.Cells(3 + i, 2).Value 'logic behind this inequality is discussed on page 5 of notes
+                k_max = k_max + 1
+        Wend
+        ' if k_max > 3, then the node separation should be changed or otherwise erreneous results would yield
+        ' because MIDAS cannot incorporate more than 4 intermediate points in a beam
+
+        If k_max > 3 Then MsgBox ("Error! Node separation is inadequate!" & Chr(10) & "Reduce node separation and proceed only after removing error!")
+        
+        For k = 1 To k_max
+            ws2.Cells(2 + i, 3 + k).Value = (-ws1.Cells(10 + k, 3).Value + ws2.Cells(2 + i, 2).Value) / nod_sep
+            ws2.Cells(2 + i, 7 + k).Value = ws1.Cells(10 + k, 1).Value
+        Next k
+        
+        ws2.Cells(2 + i, 3 + k_max + 1).Value = 1
+        ws2.Cells(2 + i, 7 + k_max + 1).Value = ws2.Cells(3 + i, 3).Value
+        
+    ' Case C (see page 3 of diary 1)
+        If i + 1 < i_max - 1 Then ' last element excluded from case C ; Note: index of last element is i-1
+            
+            Dim l As Integer
+            l = i + 1
+            
+            For i = l To i_max - 2
+            
+                ws2.Cells(2 + i, 3 + 1).Value = 0
+                ws2.Cells(2 + i, 7 + 1).Value = ws2.Cells(2 + i, 3).Value
+            
+                ' calculated contribution of input force table lying in the interior of element excluding lying at boundary cases
+                k = 0
+                For j = 1 To j_max
+                    If ws1.Cells(10 + j, 3).Value < ws2.Cells(2 + i, 2).Value Then
+                        If ws1.Cells(10 + j, 3).Value > ws2.Cells(3 + i, 2).Value Then
+                            k = k + 1
+                            ws2.Cells(2 + i, 3 + 1 + k).Value = (-ws1.Cells(10 + j, 3).Value + ws2.Cells(2 + i, 2).Value) / nod_sep
+                            ws2.Cells(2 + i, 7 + 1 + k).Value = ws1.Cells(10 + j, 1).Value
+                        End If
+                    End If
+                Next j
+                
+                If k > 2 Then MsgBox ("Error! Node separation is inadequate!" & Chr(10) & "Reduce node separation and proceed only after removing error!")
+                
+                ws2.Cells(2 + i, 3 + 1 + k + 1).Value = 1
+                ws2.Cells(2 + i, 7 + 1 + k + 1).Value = ws2.Cells(3 + i, 3).Value
+            Next
+            
+        End If
+        
+    ' Case D (see page 3 of diary 1)
+        i = i_max - 1
+        
+        ws2.Cells(2 + i, 3 + 1).Value = 0
+        ws2.Cells(2 + i, 7 + 1).Value = ws2.Cells(2 + i, 3).Value
+        
+        k = 0
+        For j = 1 To j_max
+            If ws1.Cells(10 + j, 3).Value < ws2.Cells(2 + i, 2).Value Then
+                If ws1.Cells(10 + j, 3).Value > ws2.Cells(3 + i, 2).Value Then
+                    k = k + 1
+                    ws2.Cells(2 + i, 3 + 1 + k).Value = (-ws1.Cells(10 + j, 3).Value + ws2.Cells(2 + i, 2).Value) / nod_sep
+                    ws2.Cells(2 + i, 7 + 1 + k).Value = ws1.Cells(10 + j, 1).Value
+                End If
+            End If
+        Next j
+        
+        If k > 3 Then MsgBox ("Error! Node separation is inadequate!" & Chr(10) & "Reduce node separation and proceed only after removing error!")
+    
+End Sub
