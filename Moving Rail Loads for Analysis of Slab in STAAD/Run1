@@ -1,0 +1,110 @@
+Sub Run_2()
+
+    ' last updated: 26 June 2024
+
+    ' defining worksheets
+        Set ws1 = Worksheets("Input")
+        Set ws3 = Worksheets("Nodes")
+        Set ws5 = Worksheets("Output2")
+    
+    ws5.Cells.ClearContents
+    
+    'defining column headers
+        ws5.Cells(2, 1) = "X_First Wheel"
+        ws5.Cells(2, 2) = "a"
+        ws5.Cells(2, 3) = "Nearest Girder"
+        ws5.Cells(2, 4) = "b_ef(m)"
+        ws5.Cells(2, 5) = "UDL start"
+        ws5.Cells(2, 6) = "UDL end"
+        ws5.Cells(2, 7) = "UDL (kN/m)"
+        ws5.Cells(2, 8) = "a"
+        ws5.Cells(2, 9) = "Nearest Girder"
+        ws5.Cells(2, 10) = "b_ef(m)"
+        ws5.Cells(2, 11) = "UDL start"
+        ws5.Cells(2, 12) = "UDL end"
+        ws5.Cells(2, 13) = "UDL (kN/m)"
+        
+        
+    ' storing input locations
+        in3 = "E16" ' starting x of wheel 1
+        in4 = "F17" ' step length (first input in continuous input rows)
+        in5 = "J16" ' ending x of wheel 1
+        in6 = "C2" 'no. of girders
+        in7 = "C6" ' x coordinate of G1
+    
+    ' storing cell references into row and col nos
+        'in1c = ws2.Range(in1).Column
+        in4r = ws1.Range(in4).Row
+        in4c = ws1.Range(in4).Column
+        in7r = ws1.Range(in7).Row
+        in7c = ws1.Range(in7).Column
+        
+    ' defining iterating variables
+        Dim i, j, k As Integer
+        
+    ' storing input data into variables to create flexibility in input format
+        Dim xst, xend, steplen, xgir, b1, beff_trans, wload, impf, wsep As Variant, gnos As Integer
+        
+        xst = ws1.Range(in3)
+        steplen = ws1.Cells(in4r, in4c)
+        xend = ws1.Range(in5)
+        gnos = ws1.Range(in6) ' no. of girders
+        ' storing x coordinates of girders
+            ReDim xgir(1 To gnos)
+            For j = 1 To gnos
+                xgir(j) = ws1.Cells(in7r, in7c + j - 1)
+            Next
+        b1 = ws1.Cells(in4r + 3, in4c)
+        beff_trans = ws1.Cells(in4r + 5, in4c)
+        wload = ws1.Cells(in4r + 4, in4c) ' wheel load
+        impf = ws1.Cells(in4r + 6, in4c) ' impact factor
+        wsep = ws1.Cells(in4r + 1, in4c) ' spacing of wheels in trans
+        'MsgBox (wsep)
+            
+    ' defining x coordinates of first wheel
+        Dim casnos As Integer ' no. of load cases (cas: case, nos: numbers)
+        ws5.Cells(2 + 1, 1) = xst
+        casnos = 1
+        While ws5.Cells(2 + casnos, 1) + steplen < xend
+            casnos = casnos + 1
+            ws5.Cells(2 + casnos, 1) = ws5.Cells(2 + casnos - 1, 1) + steplen
+        Wend
+        casnos = casnos + 1
+        ws5.Cells(2 + casnos, 1) = xend
+        
+    ' loop
+        For i = 1 To casnos
+            
+            ' rail 1
+                ws5.Cells(2 + i, 2) = Abs(ws5.Cells(2 + i, 1) - xgir(1))
+                ws5.Cells(2 + i, 3) = "G" & 1
+                For j = 1 To gnos
+                    If Abs(ws5.Cells(2 + i, 1) - xgir(j)) < ws5.Cells(2 + i, 2) Then
+                        ws5.Cells(2 + i, 2) = Abs(ws5.Cells(2 + i, 1) - xgir(j))
+                        ws5.Cells(2 + i, 3) = "G" & j
+                    End If
+                Next
+                
+                ws5.Cells(2 + i, 4) = 1.2 * ws5.Cells(2 + i, 2) / 1000 + b1
+                ws5.Cells(2 + i, 5) = ws5.Cells(2 + i, 1) / 1000 - beff_trans / 2
+                ws5.Cells(2 + i, 6) = ws5.Cells(2 + i, 1) / 1000 + beff_trans / 2
+                ws5.Cells(2 + i, 7) = -wload * impf / (ws5.Cells(2 + i, 4) * beff_trans)
+            
+            ' rail 2
+                ws5.Cells(2 + i, 6 + 2) = Abs(ws5.Cells(2 + i, 1) + wsep - xgir(1))
+                ws5.Cells(2 + i, 6 + 3) = "G" & 1
+                For j = 1 To gnos
+                    If Abs(ws5.Cells(2 + i, 1) + wsep - xgir(j)) < ws5.Cells(2 + i, 6 + 2) Then
+                        ws5.Cells(2 + i, 6 + 2) = Abs(ws5.Cells(2 + i, 1) + wsep - xgir(j))
+                        ws5.Cells(2 + i, 6 + 3) = "G" & j
+                    End If
+                Next
+                
+                ws5.Cells(2 + i, 6 + 4) = 1.2 * ws5.Cells(2 + i, 6 + 2) / 1000 + b1
+                ws5.Cells(2 + i, 6 + 5) = (ws5.Cells(2 + i, 1) + wsep) / 1000 - beff_trans / 2
+                ws5.Cells(2 + i, 6 + 6) = (ws5.Cells(2 + i, 1) + wsep) / 1000 + beff_trans / 2
+                ws5.Cells(2 + i, 6 + 7) = -wload * impf / (ws5.Cells(2 + i, 6 + 4) * beff_trans)
+        
+        Next
+
+End Sub
