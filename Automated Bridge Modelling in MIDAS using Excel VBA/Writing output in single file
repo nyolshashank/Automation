@@ -1,0 +1,107 @@
+Sub output_singleCol()
+    ' last updated = 14 June 2024
+    
+    ' defining worksheets
+        Set ws1 = Worksheets("Input_Gir")
+        Set ws2 = Worksheets("Output_Sup1")
+        Set ws3 = Worksheets("Input_Bearings")
+        Set ws4 = Worksheets("Output_Sup2")
+        Set ws5 = Worksheets("Input_Sub")
+        Set ws6 = Worksheets("Output_Sub")
+        Set ws7 = Worksheets("Output_SingleCol")
+        
+        ws7.Cells.ClearContents
+        
+    Dim i, j, k As Integer ' iterating indices
+        
+    Dim rowi, rowii As Integer ' row index- stores index of working row, rowii is for aiding calculations
+    Dim rowi_max As Integer              'rowi_max stores no. of elements in the module
+    
+    
+    ' Output_Sub1
+        ' identifying no. mct node output rows
+            rowi_max = 0
+            While Not IsEmpty(ws2.Cells(rowi_max + 1, 5))
+                    rowi_max = rowi_max + 1
+            Wend
+    
+        ' printing mct into single column
+            rowi = 0
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws2.Cells(i, 5)) Then
+                            rowi = rowi + 1
+                            ws7.Cells(rowi, 1) = ws2.Cells(i, 5)
+                End If
+            Next i
+            
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws2.Cells(i, 8)) Then
+                            rowi = rowi + 1
+                            ws7.Cells(rowi, 1) = ws2.Cells(i, 8)
+                End If
+            Next i
+    
+    ' Output_Sup2
+        ' identifying no. mct node output rows
+            rowi_max = 0
+            While Not IsEmpty(ws4.Cells(rowi_max + 1, 5))
+                    rowi_max = rowi_max + 1
+            Wend
+            'MsgBox (rowi_max)
+            
+        ' printing mct into single column
+            'MsgBox (Not IsEmpty(ws4.Cells(6, 6)))
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws4.Cells(i, 5)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws4.Cells(i, 5)
+                End If
+            Next i
+            
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws4.Cells(i, 6)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws4.Cells(i, 6)
+                End If
+            Next i
+            
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws4.Cells(i, 7)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws4.Cells(i, 7)
+                End If
+            Next i
+
+    ' Output_Sub
+        ' identifying no. mct node output rows
+            rowi_max = 0
+            While Not IsEmpty(ws6.Cells(rowi_max + 1, 5))
+                    rowi_max = rowi_max + 1
+            Wend
+            'MsgBox (rowi_max)
+            
+        ' printing mct into single column
+            'MsgBox (Not IsEmpty(ws6.Cells(6, 6)))
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws6.Cells(i, 5)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws6.Cells(i, 5)
+                End If
+            Next i
+            
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws6.Cells(i, 7)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws6.Cells(i, 7)
+                End If
+            Next i
+            
+            For i = 1 To rowi_max
+                If Not IsEmpty(ws6.Cells(i, 8)) Then
+                    rowi = rowi + 1
+                    ws7.Cells(rowi, 1) = ws6.Cells(i, 8)
+                End If
+            Next i
+
+    
+End Sub
