@@ -1,0 +1,142 @@
+Sub Run_1()
+
+    ' last updated: 26 June 2024
+    
+    ' What's new?: No. of girders is set variable, and Output_2 now contains
+                 ' contains output from this macro
+
+    Set ws1 = Worksheets("Input")
+    Set ws2 = Worksheets("Output2")
+    Set ws3 = Worksheets("Nodes")
+    Set ws4 = Worksheets("Load Cases")
+    
+    ws4.Cells.ClearContents
+    
+    in1 = "E3"  ' storing column location of UDL start of rail 1
+    in2 = "K3" ' storing column location of UDL start of rail 2
+        
+    in1c = ws2.Range(in1).Column
+    in2c = ws2.Range(in2).Column
+    
+    Dim nodi, nodj As Integer
+    
+        Dim i, j, k As Integer ' iterating variables
+        Dim rowi, rowi_max As Integer ' row index- stores index of working row
+        rowi = 1
+        
+        Dim d1, d2 As Variant
+        
+        rowi_max = 2
+        While Not IsEmpty(ws2.Cells(rowi_max + 1, 1))
+                rowi_max = rowi_max + 1
+        Wend
+        'MsgBox (rowi_max)
+        
+        
+    ' for loop for all load cases
+    For j = 1 To rowi_max - 2
+        ' command for load
+            ws4.Cells(1 + rowi, 1) = "LOAD " & 3 + j & " METRO " & j
+            rowi = rowi + 1
+            ws4.Cells(1 + rowi, 1) = "MEMBER LOAD"
+            rowi = rowi + 1
+        ' rail 1
+            ' counting no. of nodes lying between UDL or lying at its ends
+                nodi = 1
+                i = 1
+                While ws3.Cells(1 + i, 2) < ws2.Cells(2 + j, in1c)
+                    nodi = nodi + 1
+                    i = i + 1
+                Wend
+                'If j = 15 Then MsgBox (i)
+                'MsgBox (nodi)
+                
+                'If j = 15 Then MsgBox (ws2.Cells(2 + j, in1c + 1))
+                i = 1
+                While ws3.Cells(1 + i, 2) <= ws2.Cells(2 + j, in1c + 1)
+                    nodj = i
+                    i = i + 1
+                Wend
+                'If j = 15 Then MsgBox (nodj)
+                'MsgBox (nodj)
+                 
+            ' writing output
+                If nodj >= nodi Then
+                    If ws3.Cells(1 + nodi, 2) > ws2.Cells(2 + j, in1c) Then
+                        d1 = ws2.Cells(2 + j, in1c) - ws3.Cells(1 + nodi - 1, 2)
+                        ws4.Cells(1 + rowi, 1) = nodi - 1 & " UNI GY " & ws2.Cells(2 + j, in1c + 2) & " " & d1
+                        rowi = rowi + 1
+                    End If
+                    
+                    'If j = 15 Then MsgBox (nodj > nodi)
+                    If nodj > nodi Then
+                        'MsgBox (nodj - nodi)
+                        For i = 1 To nodj - nodi
+                            ws4.Cells(1 + rowi, 1) = nodi + i - 1 & " UNI GY " & ws2.Cells(2 + j, in1c + 2)
+                            rowi = rowi + 1
+                        Next
+                    End If
+                    
+                    If ws3.Cells(1 + nodj, 2) < ws2.Cells(2 + j, in1c + 1) Then
+                        d1 = 0
+                        d2 = ws2.Cells(2 + j, in1c + 1) - ws3.Cells(1 + nodj, 2)
+                        ws4.Cells(1 + rowi, 1) = nodj & " UNI GY " & ws2.Cells(2 + j, in1c + 2) & " " & d1 & " " & d2
+                        rowi = rowi + 1
+                    End If
+                Else
+                    d1 = ws2.Cells(2 + j, in1c) - ws3.Cells(1 + nodi - 1, 2)
+                    d2 = ws2.Cells(2 + j, in1c + 1) - ws3.Cells(1 + nodi - 1, 2)
+                    ws4.Cells(1 + rowi, 1) = nodj & " UNI GY " & ws2.Cells(2 + j, in1c + 2) & " " & d1 & " " & d2
+                    rowi = rowi + 1
+                End If
+            
+        ' rail 2
+            ' counting no. of nodes lying between UDL or lying at its ends
+                nodi = 1
+                i = 1
+                While ws3.Cells(1 + i, 2) < ws2.Cells(2 + j, in2c)
+                    nodi = nodi + 1
+                    i = i + 1
+                Wend
+                'If j = 15 Then MsgBox (nodi)
+                'MsgBox (nodi)
+                
+                i = 1
+                While ws3.Cells(1 + i, 2) <= ws2.Cells(2 + j, in2c + 1)
+                    nodj = i
+                    i = i + 1
+                Wend
+                'If j = 15 Then MsgBox (nodj)
+                'MsgBox (nodj)
+                 
+            ' writing output
+                If nodj >= nodi Then
+                    If ws3.Cells(1 + nodi, 2) > ws2.Cells(2 + j, in2c) Then
+                        d1 = ws2.Cells(2 + j, in2c) - ws3.Cells(1 + nodi - 1, 2)
+                        ws4.Cells(1 + rowi, 1) = nodi - 1 & " UNI GY " & ws2.Cells(2 + j, in2c + 2) & " " & d1
+                        rowi = rowi + 1
+                    End If
+                    
+                    If nodj > nodi Then
+                        'MsgBox (nodj - nodi)
+                        For i = 1 To nodj - nodi
+                            ws4.Cells(1 + rowi, 1) = nodi + i - 1 & " UNI GY " & ws2.Cells(2 + j, in2c + 2)
+                            rowi = rowi + 1
+                        Next
+                    End If
+                    
+                    If ws3.Cells(1 + nodj, 2) < ws2.Cells(2 + j, in2c + 1) Then
+                        d1 = 0
+                        d2 = ws2.Cells(2 + j, in2c + 1) - ws3.Cells(1 + nodj, 2)
+                        ws4.Cells(1 + rowi, 1) = nodj & " UNI GY " & ws2.Cells(2 + j, in2c + 2) & " " & d1 & " " & d2
+                        rowi = rowi + 1
+                    End If
+                Else
+                    d1 = ws2.Cells(2 + j, in2c) - ws3.Cells(1 + nodi - 1, 2)
+                    d2 = ws2.Cells(2 + j, in2c + 1) - ws3.Cells(1 + nodi - 1, 2)
+                    ws4.Cells(1 + rowi, 1) = nodj & " UNI GY " & ws2.Cells(2 + j, in2c + 2) & " " & d1 & " " & d2
+                    rowi = rowi + 1
+                End If
+    Next j
+        
+End Sub
