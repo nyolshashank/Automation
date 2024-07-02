@@ -1,0 +1,819 @@
+Sub linear_module()
+    ' last updated = 18 June 2024
+    
+    ' What's new? - Second row of bearings added at EJ's
+    
+    ' read the code once before submitting (start from pier on 14 June)
+    
+    ' defining worksheets
+        Set ws1 = Worksheets("Input_Gir")
+        Set ws2 = Worksheets("Output_Sup1")
+        Set ws3 = Worksheets("Input_Bearings")
+        Set ws4 = Worksheets("Output_Sup2")
+        Set ws5 = Worksheets("Input_Sub")
+        Set ws6 = Worksheets("Output_Sub")
+    
+    ' storing input locations
+        in1 = "A33" ' first cell of input table for input of elements
+        in2 = "C2" ' no. of spans
+        in3 = "A9" ' first cell of input table for support data (numbering of first node)
+        in4 = "A22" ' first cell of input table for bearing input (no. of bearings)
+    
+    ' storing cell references into row and col nos
+        in1r = ws1.Range(in1).Row
+        in1c = ws1.Range(in1).Column
+        in3r = ws1.Range(in3).Row
+        in3c = ws1.Range(in3).Column
+        in4r = ws3.Range(in4).Row
+        in4c = ws3.Range(in4).Column
+        
+    ' girder
+    
+        ws2.Cells.ClearContents
+    
+        'defining column headers
+        ws2.Cells(1, 1) = "#Node"
+        ws2.Cells(1, 2) = "x"
+        ws2.Cells(1, 3) = "y"
+        ws2.Cells(1, 4) = "z"
+        ws2.Cells(1, 5) = "*NODE    ; Nodes"
+        ws2.Cells(1, 6) = "Element No."  'element is from nth to (n+1)th node, where nth node is same as nth element
+        ws2.Cells(1, 7) = "Property No."
+        ws2.Cells(1, 8) = "*ELEMENT    ; Elements"
+        
+        Dim i As Integer   ' not iterating variable everywhere
+        
+        ' identifying no. of input data points
+            Dim j, elem_no As Integer              'elem_no stores no. of elements in the module
+            j = 0
+            elem_no = 0
+            While ws1.Cells(in1r + j, in1c + 1).Value > 0
+                    j = j + 1
+                    elem_no = elem_no + 1
+            Wend
+                
+        
+        ' output
+            ' first node is at origin (0,0,0) , can change in future from this part
+                ws2.Cells(2, 1) = 1
+                ws2.Cells(2, 2) = 0
+                ws2.Cells(2, 3) = 0
+                ws2.Cells(2, 4) = 0
+                ' MCT input for first node
+                    ws2.Cells(2, 5) = ws2.Cells(2, 1) & ", " & ws2.Cells(2, 2) & ", " & ws2.Cells(2, 3) & ", " & ws2.Cells(2, 4)
+                ws2.Cells(2, 7) = ws1.Cells(in1r, in1c + 1)       ' section no.
+            
+            For j = 1 To elem_no
+                ws2.Cells(j + 2, 2) = ws2.Cells(j + 1, 2) + ws1.Cells(in1r + j - 1, in1c)    ' x-coordinate
+                ws2.Cells(j + 2, 1) = j + 1         ' node number
+                ws2.Cells(j + 2, 3) = 0             ' y-coordinate
+                ws2.Cells(j + 2, 4) = 0             ' z-coordinate
+                'writing MCT node input
+                    Dim k As Integer
+                    For k = 1 To 3
+                        ws2.Cells(j + 2, 5) = ws2.Cells(j + 2, 5) & ws2.Cells(j + 2, k) & ", "
+                    Next k
+                    ws2.Cells(j + 2, 5) = ws2.Cells(j + 2, 5) & ws2.Cells(j + 2, 4)
+                ws2.Cells(j + 1, 6) = j            ' element no.
+                ws2.Cells(j + 2, 7) = ws1.Cells(in1r + j, in1c + 1)           ' section no.
+                'writing MCT Element inpit
+                'Assumptions: Frame element, Mateial = BEAM, Material = 1, ANGLE = 0, iSUB = 0
+                    ws2.Cells(j + 1, 8) = ws2.Cells(j + 1, 6) & ", BEAM, 1, " & ws2.Cells(j + 1, 7) & ", " & ws2.Cells(j + 1, 1) & ", " & ws2.Cells(j + 2, 1) & ", 0, 0"
+            Next j
+        
+    ' supports
+        ' check integral supports case
+        
+        ws4.Cells.ClearContents
+        
+        'defining column headers
+        ws4.Cells(1, 1) = "#Node"
+        ws4.Cells(1, 2) = "x"
+        ws4.Cells(1, 3) = "y"
+        ws4.Cells(1, 4) = "z"
+        ws4.Cells(1, 5) = "*NODE    ; Nodes"
+        ws4.Cells(1, 6) = "*ELASTICLINK    ; Elastic Link"
+        ws4.Cells(1, 7) = "*RIGIDLINK    ; Rigid Link"
+                            
+        ' storing input data into variables to create flexibility in input format
+            Dim nspans, lspans, suptyps, secdeps, bdeps, bnos, linktyps, bnos_ej1L, bnos_ej2R, secdep_ej1L, secdep_ej2R As Variant
+            nspans = ws1.Range(in2) ' no. of spans
+            ReDim lspans(nspans - 1), suptyps(nspans), secdeps(nspans), bdeps(nspans), bnos(nspans), linktyps(nspans)
+            For i = 0 To nspans
+                If i < nspans Then lspans(i) = ws1.Cells(in3r + 2, in3c + 2 * (i + 1))    ' storing span lengths
+                suptyps(i) = ws3.Cells(in4r + 1, in4c + 2 * (i + 1)) ' storing support type
+                'If i = 0 Then secdep_ej1L = ws3.Cells(in4r + 3, in4c + 2 * (i + 1) - 1)
+                secdeps(i) = ws3.Cells(in4r + 3, in4c + 2 * (i + 1))              ' storing depth of section
+                'If i = nspans Then secdep_ej2R = ws3.Cells(in4r + 3, in4c + 2 * (i + 1) + 1)
+                bdeps(i) = ws3.Cells(in4r + 4, in4c + 2 * (i + 1))                    ' storing bearing depth
+                If i = 0 Then bnos_ej1L = ws3.Cells(in4r, in4c + 2 * (i + 1) - 1)
+                bnos(i) = ws3.Cells(in4r, in4c + 2 * (i + 1))                         ' storing no. of bearngs at each support
+                If i = nspans Then bnos_ej2R = ws3.Cells(in4r, in4c + 2 * (i + 1) + 1)
+                linktyps(i) = ws3.Cells(in4r + 2, in4c + 2 * (i + 1))
+            Next i
+            ' declaring and assigning variables to store separation of bearings
+                Dim bseps_ej1, bseps_ej2, bseps_ej1L, bseps_ej2R As Variant
+                ReDim bseps_ej1(bnos(0) - 2), bseps_ej2(bnos(nspans) - 2), bseps_ej1L(bnos_ej1L - 2), bseps_ej2R(bnos_ej2R - 2) ' no. of bearings can't be less than 2
+                If nspans > 1 Then
+                    Dim bseps_int As Variant
+                    If suptyps(1) = "Continuous" Then
+                        ReDim bseps_int(bnos(1) - 2)       ' taking input from the first intermediate node will be the same for others
+                    End If
+                End If
+                For i = 0 To bnos(0) - 2                                ' bnos(0) >= 2 definitely
+                    bseps_ej1(i) = ws3.Cells(in4r + 8 + i, in4c + 2)
+                Next i
+                For i = 0 To bnos(nspans) - 2                           ' bnos(nspans) >= 2 definitely
+                    bseps_ej2(i) = ws3.Cells(in4r + 8 + i, in4c + 2 * (nspans + 1))
+                Next i
+                For i = 0 To bnos_ej1L - 2                              ' bnos_ej1L >= 2 definitely
+                    bseps_ej1L(i) = ws3.Cells(in4r + 8 + i, in4c + 2 - 1)
+                Next i
+                For i = 0 To bnos_ej2R - 2                              ' bnos_ej2R >= 2 definitely
+                    bseps_ej2R(i) = ws3.Cells(in4r + 8 + i, in4c + 2 * (nspans + 1) + 1)
+                Next i
+                If nspans > 1 Then
+                    If suptyps(1) = "Continuous" Then
+                        For i = 0 To bnos(1) - 2                            ' bnos(1) >= 2 definitely
+                            bseps_int(i) = ws3.Cells(in4r + 8 + i, in4c + 4)
+                        Next i
+                    End If
+                End If
+                           
+                ' long spacing and eccenticity b/w bearings at EJ's
+                    Dim blong_ej1(1), blong_ej2(1) As Variant  ' store both spacing and eccentricity
+                        'secdep_ej1L = ws3.Cells(in4r + 3, in4c + 1)
+                        'secdep_ej2R = ws3.Cells(in4r + 3, in4c + 2 * (nspans + 1) + 1)
+                    For i = 0 To 1
+                        blong_ej1(i) = ws3.Cells(in4r + 5 + i, in4c + 2)
+                        blong_ej2(i) = ws3.Cells(in4r + 5 + i, in4c + 2 * (nspans + 1))
+                    Next i
+            
+            Dim linkno, mastnode As Variant  ' link no. and master node no.
+            linkno = 1             ' link no.
+            
+            Dim xstif As Variant
+            xstif = 1000
+        ' i is not just an interating variable, it stores index of working node
+        
+        ' EJ 1
+        
+            Dim sumseps, xsupp As Variant          ' sumseps sums up bearing separations to aid calculations, xsup aids calculations
+            Dim ii As Integer                   ' ii defined to aid calculations, k is iterating variable
+            
+            ' bearing nodes
+                For i = 1 To 2 * bnos(0)
+                    ws4.Cells(1 + i, 1) = 1000 + i
+                    ws4.Cells(1 + i, 2) = 1 * blong_ej1(0) / 2 + blong_ej1(1)  ' x-coordinate
+                    ' y-coordinate
+                        sumseps = 0
+                        For j = 0 To bnos(0) - 2            ' no. of bearings can't be less than two
+                            sumseps = sumseps + bseps_ej1(j)
+                        Next j
+                        If i <= bnos(0) Then                   ' assuming integer can be compared with variant
+                            If i = 1 Then
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej1(i - 2)
+                            End If
+                        Else
+                            If i = 1 + bnos(0) Then            ' assuming integer can be compared with variant
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej1(i - bnos(0) - 2)
+                            End If
+                        End If
+                    ' z-coordinate
+                        If i <= bnos(0) Then               ' assuming integer can be compared with variant
+                            ws4.Cells(1 + i, 4) = -secdeps(0)
+                        Else
+                            ws4.Cells(1 + i, 4) = -secdeps(0) + (-1) * (bdeps(0))
+                        End If
+                Next i
+                
+                ii = i - 1
+                For i = ii + 1 To ii + 2 * bnos_ej1L
+                    ws4.Cells(1 + i, 1) = 1000 + i
+                    ws4.Cells(1 + i, 2) = -1 * blong_ej1(0) / 2 + blong_ej1(1)   ' x-coordinate
+                    ' y-coordinate
+                        sumseps = 0
+                        For j = 0 To bnos_ej1L - 2            ' no. of bearings can't be less than two
+                            sumseps = sumseps + bseps_ej1L(j)
+                        Next j
+                        If i - ii <= bnos_ej1L Then                   ' assuming integer can be compared with variant
+                            If i - ii = 1 Then
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej1L(i - ii - 2)
+                            End If
+                        Else
+                            If i - ii = 1 + bnos_ej1L Then            ' assuming integer can be compared with variant
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej1L(i - ii - bnos_ej1L - 2)
+                            End If
+                        End If
+                    ' z-coordinate
+                        If i - ii <= bnos_ej1L Then               ' assuming integer can be compared with variant
+                            ws4.Cells(1 + i, 4) = -secdeps(0)
+                        Else
+                            ws4.Cells(1 + i, 4) = -secdeps(0) + (-1) * (bdeps(0))
+                        End If
+                Next i
+
+            ' links
+                ' current module
+                    ' finding mastnode
+                        i = 1
+                        k = 1
+                        xsupp = 0
+                        mastnode = 0
+                        'MsgBox (Abs(ws2.Cells(1 + 3, 1) - ws2.Cells(1 + 3 - 1, 1)))
+                        While ws2.Cells(1 + k, 1) > 0
+                            ' ensuring minimum spacing between girder nodes
+                                If k > 1 Then
+                                    If Abs(ws2.Cells(1 + k, 2) - ws2.Cells(1 + k - 1, 2)) < 0.001 Then MsgBox ("Error! Too closely spaced girder nodes (min 0.001m)! Proceed only after removing error!")
+                                End If
+                            If Abs(ws2.Cells(1 + k, 2) - (xsupp + blong_ej1(0) / 2 + blong_ej1(1))) < 0.0001 Then mastnode = ws2.Cells(1 + k, 1) ' assuming precision in stroing values of variable by program is much greater than 0.0001
+                            k = k + 1
+                        Wend
+                        If mastnode = 0 Then MsgBox ("Error! No girder node above bearings for rigid link." & Chr(13) & "Proceed only after removing error!") ' assuming variant can be compared with exact value
+                    ' MCT output for elastic links
+                        If linktyps(0) = "Elastic-General" Then
+                            For i = 1 To bnos(0)
+                                ' Assumption: LINK=GEN; ANGLE=0; R_SDx=NO; R_SDy=NO;R_SDz=NO; R_SRx=NO; R_SRy=NO; R_SRz=NO; SDx=0; SDy=0; SDz=0, SDx=1e7; SRy=0; SRz=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(0), 1) & ", GEN, 0, NO, NO, NO, NO, NO, NO, 1e+07, 0, 0, 0, 0, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                            Next i
+                        ElseIf linktyps(0) = "Elastic-Rigid" Then
+                            For i = 1 To bnos(0)
+                                ' Assumption: LINK=RIGID; ANGLE=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(0), 1) & ", RIGID, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                            Next i
+                        Else
+                            MsgBox ("Error! Check type of bearing link!" & Chr(13) & "Proceed only after removing error")
+                        End If
+                    
+                    ' MCT output for rigid links
+                        ws4.Cells(1 + 1, 7) = mastnode & ", 111111,"
+                        For i = 1 To bnos(0)
+                            ' Assumption: DOF=1111; GROUP=unassigned
+                            ws4.Cells(1 + 1, 7) = ws4.Cells(1 + 1, 7) & " " & ws4.Cells(1 + i, 1)
+                        Next i
+                        ws4.Cells(1 + 1, 7) = ws4.Cells(1 + 1, 7) & ","
+                
+                ' LHS module
+                    ' MCT output for elastic links
+                        If linktyps(0) = "Elastic-General" Then
+                            For i = 1 + 2 * bnos(0) To bnos_ej1L + 2 * bnos(0)
+                                ' Assumption: LINK=GEN; ANGLE=0; R_SDx=NO; R_SDy=NO;R_SDz=NO; R_SRx=NO; R_SRy=NO; R_SRz=NO; SDx=0; SDy=0; SDz=0, SDx=1e7; SRy=0; SRz=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos_ej1L, 1) & ", GEN, 0, NO, NO, NO, NO, NO, NO, 1e+07, 0, 0, 0, 0, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                            Next i
+                        ElseIf linktyps(0) = "Elastic-Rigid" Then
+                            For i = 1 + 2 * bnos(0) To bnos_ej1L + 2 * bnos(0)
+                                ' Assumption: LINK=RIGID; ANGLE=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos_ej1L, 1) & ", RIGID, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                            Next i
+                        Else
+                            MsgBox ("Error! Check type of bearing link!" & Chr(13) & "Proceed only after removing error")
+                        End If
+                    
+                            
+            i = 2 * bnos(0) + 2 * bnos_ej1L + 1 ' next to last working row of EJ 1
+                    
+        ' Intermediate supports
+        
+            ' bearing nodes
+                If nspans > 1 Then                           ' no intermediate support for nspans = 1
+                    For j = 0 To nspans - 2
+                        ' bearing nodes
+                            ' x-coordinate for all nodes at particular support will be same
+                                xsupp = 0
+                                For k = 0 To j
+                                    xsupp = xsupp + lspans(k)
+                                Next k
+                            ' for integral support
+                                If suptyps(j + 1) = "Integral" Then
+                                    ' no action because corresponding support node defined in substructure
+                            ' for continuous support
+                                ElseIf suptyps(j + 1) = "Continuous" Then
+                                    ii = i - 1
+                                    While i - ii <= 2 * bnos(j + 1)      ' i-ii >=1 definitely
+                                        ws4.Cells(1 + i, 1) = (j + 2) * 1000 + i - ii    ' i>1 definitely
+                                        ws4.Cells(1 + i, 2) = xsupp   ' x-coordinate
+                                        ' y-coordinate
+                                            sumseps = 0
+                                            For k = 0 To bnos(j + 1) - 2          ' no. of bearings can't be less than two
+                                                sumseps = sumseps + bseps_int(k)
+                                            Next k
+                                            
+                                            If i - ii <= bnos(j + 1) Then               ' assuming integer can be compared with variant
+                                                If i - ii = 1 Then
+                                                    ws4.Cells(1 + i, 3) = -sumseps / 2
+                                                Else
+                                                    ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_int(i - ii - 2) ' i>=2 surely
+                                                End If
+                                            Else
+                                                If i - ii = 1 + bnos(j + 1) Then          ' assuming integer can be compared with variant
+                                                    ws4.Cells(1 + i, 3) = -sumseps / 2
+                                                Else
+                                                    ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_int(i - ii - bnos(j + 1) - 2)
+                                                End If
+                                            End If
+                                        ' z-coordinate
+                                            If i - ii <= bnos(j + 1) Then             ' assuming integer can be compared with variant
+                                                ws4.Cells(1 + i, 4) = -secdeps(j + 1)
+                                            Else
+                                                ws4.Cells(1 + i, 4) = -secdeps(j + 1) + (-1) * (bdeps(j + 1))
+                                            End If
+                                        i = i + 1
+                                    Wend
+                                Else
+                                    MsgBox ("Error! Type of support not provided correctly." & Chr(13) & "Proceed only after removing error.")
+                                End If
+                    Next j
+                End If
+            
+            ' links
+                i = 2 * bnos(0) + 2 * bnos_ej1L + 1 ' next to last working row of EJ 1
+                If nspans > 1 Then                           ' no intermediate support for nspans = 1
+                    For j = 0 To nspans - 2
+                        ' storing master node from superstructure
+                            xsupp = 0
+                            For k = 0 To j
+                                xsupp = xsupp + lspans(k)
+                            Next k
+                            k = 1
+                            mastnode = 0
+                            While ws2.Cells(1 + k, 1) > 0
+                                'If ws2.Cells(1 + k, 2) = xsupp Then mastnode = ws2.Cells(1 + k, 1)    ' assuming cell value can be compared exactly with variant
+                                If Abs(ws2.Cells(1 + k, 2) - xsupp) < 0.0001 Then mastnode = ws2.Cells(1 + k, 1) 'MsgBox (xsupp) 'mastnode = ws2.Cells(1 + k, 1)    ' assuming the provided accuracy is sufficient (define tolerance limit)
+                                k = k + 1
+                            Wend
+                            If mastnode = 0 Then MsgBox ("Error! No girder node above support location." & Chr(13) & "Proceed only after removing error!")                           ' assuming variant can be compared with exact value
+                        ' for integral support
+                            If suptyps(j + 1) = "Integral" Then
+                                ' no action because corresponding support node defined in substructure
+                        ' for continuous support
+                            ElseIf suptyps(j + 1) = "Continuous" Then
+                                ii = i - 1
+                                ' MCT output for elastic links
+                                    If linktyps(j + 1) = "Elastic-General" Then
+                                        ' Assumption: LINK=GEN; ANGLE=0; R_SDx=NO; R_SDy=NO;R_SDz=NO; R_SRx=NO; R_SRy=NO; R_SRz=NO; SDx=0; SDy=0; SDz=0, SDx=1e7; SRy=0; SRz=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                        While i - ii <= bnos(j + 1)      ' i-ii >=1 definitely
+                                            ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(j + 1), 1) & ", GEN, 0, NO, NO, NO, NO, NO, NO, 1e+07, 0, 0, 0, 0, 0, NO, 0.5, 0.5,"
+                                            linkno = linkno + 1
+                                            i = i + 1
+                                        Wend
+                                    ElseIf linktyps(j + 1) = "Elastic-Rigid" Then
+                                        ' Assumption: LINK=RIGID; ANGLE=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                                        While i - ii <= bnos(j + 1)      ' i-ii >=1 definitely
+                                            ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(j + 1), 1) & ", RIGID, 0, NO, 0.5, 0.5,"
+                                            linkno = linkno + 1
+                                            i = i + 1
+                                        Wend
+                                    Else
+                                        MsgBox ("Error! Check type of bearing link!" & Chr(13) & "Proceed only after removing error")
+                                    End If
+                                
+                                ' MCT output for rigid links
+                                    ' Assumption: DOF=1111; GROUP=unassigned
+                                    i = i - bnos(j + 1)
+                                    ws4.Cells(1 + ii + 1, 7) = mastnode & ", 111111,"
+                                    While i - ii <= bnos(j + 1)      ' i-ii >=1 definitely
+                                        ws4.Cells(1 + ii + 1, 7) = ws4.Cells(1 + ii + 1, 7) & " " & ws4.Cells(1 + i, 1)
+                                        i = i + 1
+                                    Wend
+                                    ws4.Cells(1 + ii + 1, 7) = ws4.Cells(1 + ii + 1, 7) & ","
+                                
+                                i = i + bnos(j + 1)
+                            Else
+                                MsgBox ("Error! Type of support not provided correctly." & Chr(13) & "Proceed only after removing error.")
+                            End If
+                    Next j
+                End If
+                
+        ' EJ 2
+            ' bearing nodes
+                ii = i - 1
+                While i - ii <= 2 * bnos(nspans)
+                    ws4.Cells(1 + i, 1) = (nspans + 1) * 1000 + i - ii
+                    ' x-coordinate
+                        xsupp = 0
+                        For k = 0 To nspans - 1
+                            xsupp = xsupp + lspans(k)
+                        Next k
+                        ws4.Cells(1 + i, 2) = xsupp - 1 * blong_ej2(0) / 2 + blong_ej2(1)
+                    ' y-coordinate
+                        sumseps = 0
+                        For j = 0 To bnos(nspans) - 2            ' no. of bearings can't be less than two
+                            sumseps = sumseps + bseps_ej2(j)
+                        Next j
+                        
+                        If i - ii <= bnos(nspans) Then                 ' assuming integer can be compared with variant
+                            If i - ii = 1 Then
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej2(i - ii - 2)
+                            End If
+                        Else
+                            If i - ii = 1 + bnos(nspans) Then          ' assuming integer can be compared with variant
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej2(i - ii - bnos(nspans) - 2)
+                            End If
+                        End If
+                    ' z-coordinate
+                        If i - ii <= bnos(nspans) Then             ' assuming integer can be compared with variant
+                            ws4.Cells(1 + i, 4) = -secdeps(nspans)
+                        Else
+                            ws4.Cells(1 + i, 4) = -secdeps(nspans) + (-1) * (bdeps(nspans))
+                        End If
+                    i = i + 1
+                Wend
+                
+                ii = i - 1
+                While i - ii <= 2 * bnos_ej2R
+                    ws4.Cells(1 + i, 1) = (nspans + 1) * 1000 + i - ii + 2 * bnos(nspans)
+                    ' x-coordinate
+                        xsupp = 0
+                        For k = 0 To nspans - 1
+                            xsupp = xsupp + lspans(k)
+                        Next k
+                        ws4.Cells(1 + i, 2) = xsupp + 1 * blong_ej2(0) / 2 + blong_ej2(1)
+                    ' y-coordinate
+                        sumseps = 0
+                        For j = 0 To bnos_ej2R - 2            ' no. of bearings can't be less than two
+                            sumseps = sumseps + bseps_ej2R(j)
+                        Next j
+                        
+                        If i - ii <= bnos_ej2R Then                 ' assuming integer can be compared with variant
+                            If i - ii = 1 Then
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej2R(i - ii - 2)
+                            End If
+                        Else
+                            If i - ii = 1 + bnos_ej2R Then          ' assuming integer can be compared with variant
+                                ws4.Cells(1 + i, 3) = -sumseps / 2
+                            Else
+                                ws4.Cells(1 + i, 3) = ws4.Cells(1 + i - 1, 3) + bseps_ej2R(i - ii - bnos_ej2R - 2)
+                            End If
+                        End If
+                    ' z-coordinate
+                        If i - ii <= bnos_ej2R Then             ' assuming integer can be compared with variant
+                            ws4.Cells(1 + i, 4) = -secdeps(nspans)
+                        Else
+                            ws4.Cells(1 + i, 4) = -secdeps(nspans) + (-1) * (bdeps(nspans))
+                        End If
+                    i = i + 1
+                Wend
+
+                
+            ' links
+                i = i - 2 * bnos(nspans) - 2 * bnos_ej2R
+                ii = i - 1
+                ' current module
+                    ' storing master node from superstructure
+                        xsupp = 0
+                        For k = 0 To nspans - 1
+                            xsupp = xsupp + lspans(k)
+                        Next k
+                        k = 1
+                        mastnode = 0
+                        While ws2.Cells(1 + k, 1) > 0
+                            If Abs(ws2.Cells(1 + k, 2) - (xsupp - 1 * blong_ej2(0) / 2 + blong_ej2(1))) < 0.0001 Then mastnode = ws2.Cells(1 + k, 1)  ' assuming cell value can be compared exactly with variant
+                            k = k + 1
+                        Wend
+                        If mastnode = 0 Then MsgBox ("Error! No girder node above bearings for rigid link." & Chr(13) & "Proceed only after removing error!")                           ' assuming variant can be compared with exact value
+                        
+                    ' MCT output for elastic links
+                        If linktyps(nspans) = "Elastic-General" Then
+                            ' Assumption: LINK=GEN; ANGLE=0; R_SDx=NO; R_SDy=NO;R_SDz=NO; R_SRx=NO; R_SRy=NO; R_SRz=NO; SDx=0; SDy=0; SDz=0, SDx=1e7; SRy=0; SRz=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                            While i - ii <= bnos(nspans)      ' i-ii >=1 definitely
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(nspans), 1) & ", GEN, 0, NO, NO, NO, NO, NO, NO, 1e+07, 0, 0, 0, 0, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                                i = i + 1
+                            Wend
+                        ElseIf linktyps(nspans) = "Elastic-Rigid" Then
+                            ' Assumption: LINK=RIGID; ANGLE=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                            While i - ii <= bnos(nspans)      ' i-ii >=1 definitely
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos(nspans), 1) & ", RIGID, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                                i = i + 1
+                            Wend
+                        Else
+                            MsgBox ("Error! Check type of bearing link!" & Chr(13) & "Proceed only after removing error")
+                        End If
+                    
+                    ' MCT output for rigid links
+                        ' Assumption: DOF=1111; GROUP=unassigned
+                        i = i - bnos(nspans)
+                        ws4.Cells(1 + ii + 1, 7) = mastnode & ", 111111,"
+                        While i - ii <= bnos(nspans)      ' i-ii >=1 definitely
+                            ws4.Cells(1 + ii + 1, 7) = ws4.Cells(1 + ii + 1, 7) & " " & ws4.Cells(1 + i, 1)
+                            i = i + 1
+                        Wend
+                        ws4.Cells(1 + ii + 1, 7) = ws4.Cells(1 + ii + 1, 7) & ","
+                
+                ' RHS module
+                    ' MCT output for elastic links
+                        i = i + bnos(nspans)
+                        ii = i - 1
+                        If linktyps(nspans) = "Elastic-General" Then
+                            ' Assumption: LINK=GEN; ANGLE=0; R_SDx=NO; R_SDy=NO;R_SDz=NO; R_SRx=NO; R_SRy=NO; R_SRz=NO; SDx=0; SDy=0; SDz=0, SDx=1e7; SRy=0; SRz=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                            While i - ii <= bnos_ej2R      ' i-ii >=1 definitely
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos_ej2R, 1) & ", GEN, 0, NO, NO, NO, NO, NO, NO, 1e+07, 0, 0, 0, 0, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                                i = i + 1
+                            Wend
+                        ElseIf linktyps(nspans) = "Elastic-Rigid" Then
+                            ' Assumption: LINK=RIGID; ANGLE=0; bSHEAR=NO; DRy=0.5;DRz=0.5; GROUP=unassigned
+                            While i - ii <= bnos_ej2R      ' i-ii >=1 definitely
+                                ws4.Cells(1 + i, 6) = linkno & ", " & ws4.Cells(1 + i, 1) & ", " & ws4.Cells(1 + i + bnos_ej2R, 1) & ", RIGID, 0, NO, 0.5, 0.5,"
+                                linkno = linkno + 1
+                                i = i + 1
+                            Wend
+                        Else
+                            MsgBox ("Error! Check type of bearing link!" & Chr(13) & "Proceed only after removing error")
+                        End If
+                        i = i + bnos_ej2R
+                    
+        ' writing MCT input of nodes
+        For j = 1 To i - 1     ' here j is just an iterating variabke
+            For k = 1 To 3
+                ws4.Cells(1 + j, 5).Value = ws4.Cells(1 + j, 5).Value & ws4.Cells(1 + j, k).Value & ", "
+            Next k
+            ws4.Cells(1 + j, 5).Value = ws4.Cells(1 + j, 5).Value & ws4.Cells(1 + j, 4).Value
+        Next j
+    
+    ' code to determine coordinates of piercap centers
+            Dim x, y, z As Variant ' coordinates of piercap center
+            ReDim x(nspans), y(nspans), z(nspans)
+            
+            For i = 0 To nspans
+                ' x-coordinate
+                    If i = 0 Then
+                        x(i) = 0
+                    Else
+                        x(i) = x(i - 1) + lspans(i - 1)
+                    End If
+                ' y-coordinate
+                    y(i) = 0
+                ' z-coordinate
+                    If suptyp = "Integral" Then
+                        z(i) = -secdeps(i)
+                    Else
+                        z(i) = -secdeps(i) - bdeps(i)
+                    End If
+            Next i
+    
+    ' substructure
+        
+        ws6.Cells.ClearContents
+            
+        'defining column headers
+            ws6.Cells(1, 1) = "#Node"
+            ws6.Cells(1, 2) = "x"
+            ws6.Cells(1, 3) = "y"
+            ws6.Cells(1, 4) = "z"
+            ws6.Cells(1, 5) = "*NODE    ; Nodes"
+            ws6.Cells(1, 6) = "Property No."
+            ws6.Cells(1, 7) = "*ELEMENT    ; Elements"
+            ws6.Cells(1, 8) = "*RIGIDLINK    ; Rigid Link"
+        
+        ' locations of input
+            in6 = "F9"    ' rect sec depth of piercap
+            in8 = "F13"   ' tapered sec depth of piercap
+            
+            in7 = "F26"  ' depth of pier above EGL
+            
+            in9 = "F32"  ' depth of pilecap
+            
+            in10 = "F38"  ' no. of piles
+            in11 = "G45"  ' cell no. of pile no. 1
+                        
+        ' converting cell reference from characters to rows & cols
+            in11r = ws5.Range(in11).Row
+            in11c = ws5.Range(in11).Column
+            in6r = ws5.Range(in6).Row
+            in6c = ws5.Range(in6).Column
+            in8r = ws5.Range(in8).Row
+            in8c = ws5.Range(in8).Column
+            in7r = ws5.Range(in7).Row
+            in7c = ws5.Range(in7).Column
+            in9r = ws5.Range(in9).Row
+            in9c = ws5.Range(in9).Column
+            in10r = ws5.Range(in10).Row
+            in10c = ws5.Range(in10).Column
+    
+        ' iterating variables- i, j, k
+        ' storing input into variables
+            Dim recdep, tapdep, recprop, tapprop As Variant
+            ReDim recdep(nspans), tapdep(nspans), recprop(nspans), tapprop(nspans)
+            For k = 0 To nspans
+                recdep(k) = ws5.Cells(in6r, in6c + k)
+                tapdep(k) = ws5.Cells(in8r, in8c + k)
+                recprop(k) = ws5.Cells(in6r - 1, in6c + k)
+                tapprop(k) = ws5.Cells(in8r - 1, in8c + k)
+            Next k
+            
+            Dim pierdepab, pierdepbel, pierprop As Variant
+            ReDim pierdepab(k), pierdepbel(k), pierprop(k) As Variant
+            For k = 0 To nspans
+                pierdepab(k) = ws5.Cells(in7r, in7c + k)
+                pierdepbel(k) = ws5.Cells(in7r + 1, in7c + k)
+                pierprop(k) = ws5.Cells(in7r - 1, in7c + k)
+            Next k
+            
+            Dim pilcapdep, pilcapprop As Variant
+            ReDim pilcapdep(nspans), pilcapprop(nspans)
+            For k = 0 To nspans
+                pilcapdep(k) = ws5.Cells(in9r, in9c + k)
+                pilcapprop(k) = ws5.Cells(in9r - 1, in9c + k)
+            Next k
+                    
+            Dim npiles, pileprop, elemlen As Variant
+            ReDim npiles(nspans), pileprop(nspans), elemlen(nspans)
+            For k = 0 To nspans
+                npiles(k) = ws5.Cells(in10r, in10c + k)
+                elemlen(k) = ws5.Cells(in10r + 3, in10c + k)
+                pileprop(k) = ws5.Cells(in10r + 2, in10c + k)
+            Next k
+        
+        ' variable storing next row to last filled row in output
+            Dim nodi As Integer
+            nodi = 1
+                    
+        ' interation over all piers
+            Dim nodii As Integer ' variable to aid calculations involving nodi
+            
+            Dim pilei As Variant
+            ReDim pilei(nspans)
+            
+            Dim piletoplvl As Variant ' top of piles level
+            ReDim piletoplvl(nspans)
+            
+            Dim pileii As Integer ' stores the working index of input pile coordinates table
+            pileii = 1
+        
+            For k = 0 To nspans
+                nodii = nodi - 1
+                ' piercap
+                    If suptyps(k) = "Integral" Then
+                        ws6.Cells(1 + nodi, 1) = (k + 1) * 1000 + 100 + nodi - nodii
+                        ws6.Cells(1 + nodi, 2) = x(k)
+                        ws6.Cells(1 + nodi, 3) = y(k)
+                        ws6.Cells(1 + nodi, 4) = z(k)
+                        nodi = nodi + 1
+                        ' no piercap in integral
+                    Else
+                        ' nodes; x and y coordinates
+                            For nodi = nodi To nodi + 2
+                                ws6.Cells(1 + nodi, 1) = (k + 1) * 1000 + 100 + nodi - nodii
+                                ws6.Cells(1 + nodi, 2) = x(k)
+                                ws6.Cells(1 + nodi, 3) = y(k)
+                            Next nodi
+                        ' z coordinates
+                            ws6.Cells(1 + nodi - 3, 4) = z(k)
+                            ws6.Cells(1 + nodi - 2, 4) = z(k) - recdep(k)
+                            ws6.Cells(1 + nodi - 1, 4) = z(k) - recdep(k) - tapdep(k)
+                        ' prop nos.
+                            ws6.Cells(1 + nodi - 3, 6) = recprop(k)
+                            ws6.Cells(1 + nodi - 2, 6) = tapprop(k)
+                    End If
+                    ' rigid link
+                        If suptyps(k) = "Integral" Then
+                            xsupp = x(k)
+                            j = 1
+                            mastnode = 0
+                            While ws2.Cells(1 + j, 1) > 0
+                                'If ws2.Cells(1 + j, 2) = xsupp Then mastnode = ws2.Cells(1 + j, 1) ' assuming cell value can be compared exactly with variant
+                                If Abs(ws2.Cells(1 + j, 2) - xsupp) < 0.0001 Then mastnode = ws2.Cells(1 + j, 1) ' assuming the provided accuracy is sufficient (define tolerance limit)
+                                j = j + 1
+                            Wend
+                            If mastnode = 0 Then MsgBox ("Error! No girder node above support location." & Chr(13) & "Proceed only after removing error!") ' assuming variant can be compared with exact value
+                            ' Assumption: DOF=1111; GROUP=unassigned
+                            ws6.Cells(1 + nodii + 1, 8) = mastnode & ", 111111," & " " & (k + 1) * 1000 + 100 + 1 & ","
+                        Else
+                            mastnode = ws6.Cells(1 + nodii + 1, 1)
+                            ws6.Cells(1 + nodii + 1, 8) = mastnode & ", 111111,"
+                            For i = 1 To bnos(k)
+                                ' Assumption: DOF=1111; GROUP=unassigned
+                                ws6.Cells(1 + nodii + 1, 8) = ws6.Cells(1 + nodii + 1, 8) & " " & (k + 1) * 1000 + bnos(k) + i
+                            Next i
+                            If k = 0 Then
+                                For i = 1 To bnos_ej1L
+                                    ' Assumption: DOF=1111; GROUP=unassigned
+                                    ws6.Cells(1 + nodii + 1, 8) = ws6.Cells(1 + nodii + 1, 8) & " " & (k + 1) * 1000 + 2 * bnos(k) + bnos_ej1L + i
+                                Next i
+                            ElseIf k = nspans Then
+                                For i = 1 To bnos_ej2R
+                                    ' Assumption: DOF=1111; GROUP=unassigned
+                                    ws6.Cells(1 + nodii + 1, 8) = ws6.Cells(1 + nodii + 1, 8) & " " & (k + 1) * 1000 + 2 * bnos(k) + bnos_ej2R + i
+                                Next i
+                            End If
+                            ws6.Cells(1 + nodii + 1, 8) = ws6.Cells(1 + nodii + 1, 8) & ","
+                                                        
+                        End If
+                
+                ' pier
+                    ' no. of elements in pier
+                        If pierdepbel(k) > 0 Then
+                            i = 2
+                        Else
+                            i = 1
+                        End If
+                    ' nodes; x and y coordinates
+                        For nodi = nodi To nodi + i - 1
+                            ws6.Cells(1 + nodi, 1) = (k + 1) * 1000 + 100 + nodi - nodii
+                            ws6.Cells(1 + nodi, 2) = x(k)
+                            ws6.Cells(1 + nodi, 3) = y(k)
+                        Next nodi
+                    ' z coordinates; prop nos
+                        nodi = nodi - i
+                        ws6.Cells(1 + nodi, 4) = ws6.Cells(1 + nodi - 1, 4) - pierdepab(k)
+                        ws6.Cells(1 + nodi - 1, 6) = pierprop(k)
+                        nodi = nodi + 1
+                        If i = 2 Then
+                            ws6.Cells(1 + nodi, 4) = ws6.Cells(1 + nodi - 1, 4) - pierdepbel(k)
+                            ws6.Cells(1 + nodi - 1, 6) = pierprop(k)
+                            nodi = nodi + 1
+                        End If
+                        
+                ' pilecap
+                    ws6.Cells(1 + nodi, 1) = (k + 1) * 1000 + 100 + nodi - nodii
+                    ws6.Cells(1 + nodi, 2) = x(k)
+                    ws6.Cells(1 + nodi, 3) = y(k)
+                    ws6.Cells(1 + nodi, 4) = ws6.Cells(1 + nodi - 1, 4) - pilcapdep(k)
+                    ws6.Cells(1 + nodi - 1, 6) = pilcapprop(k)
+                    nodi = nodi + 1
+                    
+                    pilei(k) = nodi ' variable storing first filled row of piles in output
+                    
+                ' piles (nodes, coordinates, property nos, MCT elements)
+                        piletoplvl(k) = ws6.Cells(1 + nodi - 1, 4)
+                        
+                    ' rigid link
+                        mastnode = ws6.Cells(1 + nodi - 1, 1)
+                        ws6.Cells(1 + nodi - 1, 8) = mastnode & ", 111111,"
+                        For i = 1 To npiles(k)
+                            ' Assumption: DOF=1111; GROUP=unassigned
+                            ws6.Cells(1 + nodi - 1, 8) = ws6.Cells(1 + nodi - 1, 8) & " " & (k + 1) * 100000 + i * 1000
+                        Next i
+                        ws6.Cells(1 + nodi - 1, 8) = ws6.Cells(1 + nodi - 1, 8) & ","
+                        
+                    For i = pileii To pileii + npiles(k) - 1
+                        ' first node of pile
+                            ws6.Cells(1 + nodi, 1) = (k + 1) * 100000 + (i - pileii + 1) * 1000
+                            
+                        ws6.Cells(1 + nodi, 2) = x(k) + ws5.Cells(in11r + i - 1, in11c + 1)
+                        ws6.Cells(1 + nodi, 3) = y(k) + ws5.Cells(in11r + i - 1, in11c + 2)
+                        ws6.Cells(1 + nodi, 4) = piletoplvl(k)
+                        ws6.Cells(1 + nodi, 6) = pileprop(k)
+                        ws6.Cells(1 + nodi, 7) = ws6.Cells(1 + nodi, 1) + 1 & ", BEAM, 1, " & ws6.Cells(1 + nodi, 6) & ", " & ws6.Cells(1 + nodi, 1) & ", " & ws6.Cells(1 + nodi, 1) + 1 & ", 0, 0"
+                        nodi = nodi + 1
+                        j = 1
+                        
+                        While ws6.Cells(1 + nodi - 1 + j - 1, 4) - elemlen(k) > piletoplvl(k) - ws5.Cells(in11r + i - 1, in11c + 3)
+                            ws6.Cells(1 + nodi - 1 + j, 1) = ws6.Cells(1 + nodi - 1 + j - 1, 1) + 1
+                            ws6.Cells(1 + nodi - 1 + j, 2) = x(k) + ws5.Cells(in11r + i - 1, in11c + 1)
+                            ws6.Cells(1 + nodi - 1 + j, 3) = y(k) + ws5.Cells(in11r + i - 1, in11c + 2)
+                            ws6.Cells(1 + nodi - 1 + j, 4) = ws6.Cells(1 + nodi - 1 + j - 1, 4) - elemlen(k)
+                            ws6.Cells(1 + nodi - 1 + j, 6) = pileprop(k)
+                            ws6.Cells(1 + nodi - 1 + j, 7) = ws6.Cells(1 + nodi - 1 + j, 1) + 1 & ", BEAM, 1, " & ws6.Cells(1 + nodi - 1 + j, 6) & ", " & ws6.Cells(1 + nodi - 1 + j, 1) & ", " & ws6.Cells(1 + nodi - 1 + j, 1) + 1 & ", 0, 0"
+                            j = j + 1
+                        Wend
+                        nodi = nodi + j - 1
+                        
+                        ws6.Cells(1 + nodi, 1) = ws6.Cells(1 + nodi - 1, 1) + 1
+                        ws6.Cells(1 + nodi, 2) = x(k) + ws5.Cells(in11r + i - 1, in11c + 1)
+                        ws6.Cells(1 + nodi, 3) = y(k) + ws5.Cells(in11r + i - 1, in11c + 2)
+                        ws6.Cells(1 + nodi, 4) = piletoplvl(k) - ws5.Cells(in11r + i - 1, in11c + 3)
+                        nodi = nodi + 1
+                    Next i
+                    pileii = i
+                    
+                ' MCT for elements
+                    ' piercap, pier, pilecap
+                        For j = nodii + 1 To pilei(k) - 1
+                            ' elements
+                                'Assumptions: Frame element, Mateial = BEAM, Material = 1,ANGLE = 0, iSUB = 0
+                                If j < pilei(k) - 1 Then
+                                    ws6.Cells(1 + j, 7) = (k + 1) * 1000 + 100 + j - nodii & ", BEAM, 1, " & ws6.Cells(1 + j, 6) & ", " & ws6.Cells(1 + j, 1) & ", " & ws6.Cells(1 + j + 1, 1) & ", 0, 0"
+                                End If
+                        Next j
+            Next k
+        
+        ' MCT for nodes
+            For j = 1 To nodi - 1
+                ' nodes
+                    For k = 1 To 3
+                        ws6.Cells(1 + j, 5) = ws6.Cells(1 + j, 5) & ws6.Cells(1 + j, k) & ", "
+                    Next k
+                    ws6.Cells(1 + j, 5) = ws6.Cells(1 + j, 5) & ws6.Cells(1 + j, 4)
+            Next j
+End Sub
